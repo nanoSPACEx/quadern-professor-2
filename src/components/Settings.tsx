@@ -11,7 +11,7 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskType, setNewTaskType] = useState<TaskType>('treball');
   const [newTaskWeight, setNewTaskWeight] = useState<number>(1);
-  const [newTaskTerm, setNewTaskTerm] = useState<Term>(1);
+  const [newTaskTerm, setNewTaskTerm] = useState<Term>('1r Trimestre');
   const [bulkStudents, setBulkStudents] = useState('');
 
   // Bulk edit state
@@ -28,6 +28,18 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
     e.preventDefault();
     if (!editingTask) return;
     
+    if (editingTask.type === 'opcional') {
+      if (editingTask.weight < 0.1 || editingTask.weight > 100) {
+        alert('El pes per a tasques opcionals ha de ser entre 0.1 i 100.');
+        return;
+      }
+    } else {
+      if (editingTask.weight <= 0) {
+        alert('El pes per a treballs i exàmens ha de ser superior a 0.');
+        return;
+      }
+    }
+    
     onUpdateGroup({
       ...group,
       tasks: group.tasks.map(t => t.id === editingTask.id ? editingTask : t)
@@ -38,6 +50,18 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskName.trim()) return;
+
+    if (newTaskType === 'opcional') {
+      if (newTaskWeight < 0.1 || newTaskWeight > 100) {
+        alert('El pes per a tasques opcionals ha de ser entre 0.1 i 100.');
+        return;
+      }
+    } else {
+      if (newTaskWeight <= 0) {
+        alert('El pes per a treballs i exàmens ha de ser superior a 0.');
+        return;
+      }
+    }
 
     const newTask: Task = {
       id: `t_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
@@ -107,17 +131,37 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
   const handleBulkEdit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    let hasValidationError = false;
+
     const updatedTasks = group.tasks.map(task => {
       if (selectedTasks.has(task.id)) {
+        const newType = bulkEditType !== '' ? bulkEditType as TaskType : task.type;
+        const newWeight = bulkEditWeight !== '' ? Number(bulkEditWeight) : task.weight;
+        
+        if (newType === 'opcional') {
+          if (newWeight < 0.1 || newWeight > 100) {
+            hasValidationError = true;
+          }
+        } else {
+          if (newWeight <= 0) {
+            hasValidationError = true;
+          }
+        }
+
         return {
           ...task,
-          type: bulkEditType !== '' ? bulkEditType as TaskType : task.type,
-          weight: bulkEditWeight !== '' ? Number(bulkEditWeight) : task.weight,
-          term: bulkEditTerm !== '' ? Number(bulkEditTerm) as Term : task.term,
+          type: newType,
+          weight: newWeight,
+          term: bulkEditTerm !== '' ? bulkEditTerm as Term : task.term,
         };
       }
       return task;
     });
+
+    if (hasValidationError) {
+      alert('Error de validació: El pes per a tasques opcionals ha de ser entre 0.1 i 100. El pes per a treballs i exàmens ha de ser superior a 0.');
+      return;
+    }
 
     onUpdateGroup({
       ...group,
@@ -134,7 +178,7 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
   const handleBulkAddStudents = () => {
     if (!bulkStudents.trim()) return;
     
-    const names = bulkStudents.split('\\n').map(n => n.trim()).filter(n => n);
+    const names = bulkStudents.split('\n').map(n => n.trim()).filter(n => n);
     const newStudents: Student[] = names.map(name => ({
       id: `s_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       name,
@@ -182,7 +226,7 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
           task.name && typeof task.name === 'string' &&
           task.type && (task.type === 'treball' || task.type === 'exam' || task.type === 'opcional') &&
           typeof task.weight === 'number' &&
-          (task.term === 1 || task.term === 2 || task.term === 3)
+          (task.term === '1r Trimestre' || task.term === '2n Trimestre' || task.term === '3r Trimestre')
         ) as ImportedTask[];
 
         if (validTasks.length === 0) {
@@ -317,12 +361,12 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
                 <label className="text-sm font-medium text-slate-700 whitespace-nowrap">Trimestre:</label>
                 <select
                   value={newTaskTerm}
-                  onChange={(e) => setNewTaskTerm(Number(e.target.value) as Term)}
+                  onChange={(e) => setNewTaskTerm(e.target.value as Term)}
                   className="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white flex-1"
                 >
-                  <option value={1}>1r Trimestre</option>
-                  <option value={2}>2n Trimestre</option>
-                  <option value={3}>3r Trimestre</option>
+                  <option value="1r Trimestre">1r Trimestre</option>
+                  <option value="2n Trimestre">2n Trimestre</option>
+                  <option value="3r Trimestre">3r Trimestre</option>
                 </select>
               </div>
               <div className="flex items-center gap-2 flex-1 w-full">
@@ -331,11 +375,13 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
                 </label>
                 <input
                   type="number"
-                  min="0.1"
-                  step="0.1"
+                  min={newTaskType === 'opcional' ? "0.1" : "0.01"}
+                  max={newTaskType === 'opcional' ? "100" : undefined}
+                  step="0.01"
                   value={newTaskWeight}
                   onChange={(e) => setNewTaskWeight(Number(e.target.value))}
                   className="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white flex-1"
+                  required
                 />
               </div>
               <button
@@ -389,7 +435,7 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
                     {task.type === 'exam' ? 'Examen' : task.type === 'opcional' ? 'Opcional' : 'Treball'}
                   </span>
                   <span className="text-xs px-2 py-1 rounded-full font-medium bg-blue-100 text-blue-700">
-                    T{task.term}
+                    {task.term}
                   </span>
                   <span className="text-xs px-2 py-1 rounded-full font-medium bg-amber-100 text-amber-700">
                     {task.type === 'opcional' ? `Bonus: +${task.weight}%` : `Pes: ${task.weight}`}
@@ -448,10 +494,10 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
           <div className="max-h-96 overflow-y-auto pr-2 space-y-2">
             {group.students.map(student => (
               <div key={student.id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-lg group">
-                <span className="font-medium text-slate-700">{student.name}</span>
+                <span className="font-medium text-slate-700 truncate mr-2" title={student.name}>{student.name}</span>
                 <button
                   onClick={() => handleRemoveStudent(student.id)}
-                  className="text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all"
+                  className="text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
                   title="Eliminar alumne"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -499,13 +545,13 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Trimestre</label>
                 <select
                   value={bulkEditTerm}
-                  onChange={(e) => setBulkEditTerm(e.target.value === '' ? '' : Number(e.target.value) as Term)}
+                  onChange={(e) => setBulkEditTerm(e.target.value === '' ? '' : e.target.value as Term)}
                   className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 >
                   <option value="">-- No modificar --</option>
-                  <option value={1}>1r Trimestre</option>
-                  <option value={2}>2n Trimestre</option>
-                  <option value={3}>3r Trimestre</option>
+                  <option value="1r Trimestre">1r Trimestre</option>
+                  <option value="2n Trimestre">2n Trimestre</option>
+                  <option value="3r Trimestre">3r Trimestre</option>
                 </select>
               </div>
               <div>
@@ -525,8 +571,9 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
                 </label>
                 <input
                   type="number"
-                  min="0.1"
-                  step="0.1"
+                  min={bulkEditType === 'opcional' ? "0.1" : "0.01"}
+                  max={bulkEditType === 'opcional' ? "100" : undefined}
+                  step="0.01"
                   value={bulkEditWeight}
                   onChange={(e) => setBulkEditWeight(e.target.value === '' ? '' : Number(e.target.value))}
                   placeholder="-- No modificar --"
@@ -596,12 +643,12 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Trimestre</label>
                 <select
                   value={editingTask.term}
-                  onChange={(e) => setEditingTask({ ...editingTask, term: Number(e.target.value) as Term })}
+                  onChange={(e) => setEditingTask({ ...editingTask, term: e.target.value as Term })}
                   className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 >
-                  <option value={1}>1r Trimestre</option>
-                  <option value={2}>2n Trimestre</option>
-                  <option value={3}>3r Trimestre</option>
+                  <option value="1r Trimestre">1r Trimestre</option>
+                  <option value="2n Trimestre">2n Trimestre</option>
+                  <option value="3r Trimestre">3r Trimestre</option>
                 </select>
               </div>
               <div>
@@ -610,8 +657,9 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
                 </label>
                 <input
                   type="number"
-                  min="0.1"
-                  step="0.1"
+                  min={editingTask.type === 'opcional' ? "0.1" : "0.01"}
+                  max={editingTask.type === 'opcional' ? "100" : undefined}
+                  step="0.01"
                   value={editingTask.weight}
                   onChange={(e) => setEditingTask({ ...editingTask, weight: Number(e.target.value) })}
                   className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"

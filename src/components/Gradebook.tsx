@@ -11,13 +11,18 @@ interface GradebookProps {
 export function Gradebook({ students, tasks, onGradeChange }: GradebookProps) {
   const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
   const [selectedTerm, setSelectedTerm] = useState<Term | 'all'>('all');
   const filterRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
         setIsFilterOpen(false);
+      }
+      if (exportRef.current && !exportRef.current.contains(event.target as Node)) {
+        setIsExportOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -27,12 +32,16 @@ export function Gradebook({ students, tasks, onGradeChange }: GradebookProps) {
   const termFilteredTasks = tasks.filter(t => selectedTerm === 'all' || t.term === selectedTerm);
   const visibleTasks = termFilteredTasks.filter(t => !hiddenTasks.has(t.id));
 
-  const calculateAverage = (student: Student) => {
+  const calculateAverage = (student: Student, specificTerm?: Term) => {
     let sum = 0;
     let weightSum = 0;
     let bonus = 0;
 
-    visibleTasks.forEach(task => {
+    const tasksToAverage = specificTerm 
+      ? tasks.filter(t => t.term === specificTerm)
+      : visibleTasks;
+
+    tasksToAverage.forEach(task => {
       const grade = student.grades[task.id];
       if (grade != null) {
         if (task.type === 'opcional') {
@@ -76,14 +85,37 @@ export function Gradebook({ students, tasks, onGradeChange }: GradebookProps) {
     }
   };
 
-  const handleExportCSV = () => {
-    const headers = ['Alumne', 'Mitjana', ...visibleTasks.map(t => `"${t.name}"`)];
+  const handleExportCSV = (termToExport: Term | 'all') => {
+    const baseTasks = termToExport === 'all' ? tasks : tasks.filter(t => t.term === termToExport);
+    const tasksToExport = baseTasks.filter(t => !hiddenTasks.has(t.id));
+    
+    const headers = ['Alumne', 'Mitjana', ...tasksToExport.map(t => `"${t.name}"`)];
     
     const rows = students.map(student => {
+      let sum = 0;
+      let weightSum = 0;
+      let bonus = 0;
+
+      tasksToExport.forEach(task => {
+        const grade = student.grades[task.id];
+        if (grade != null) {
+          if (task.type === 'opcional') {
+            bonus += (grade * task.weight) / 100;
+          } else {
+            sum += grade * task.weight;
+            weightSum += task.weight;
+          }
+        }
+      });
+
+      let average = weightSum > 0 ? (sum / weightSum) : 0;
+      average += bonus;
+      if (average > 10) average = 10;
+
       const row = [
         `"${student.name}"`,
-        calculateAverage(student),
-        ...visibleTasks.map(t => student.grades[t.id] ?? '')
+        average.toFixed(2),
+        ...tasksToExport.map(t => student.grades[t.id] ?? '')
       ];
       return row.join(',');
     });
@@ -93,10 +125,12 @@ export function Gradebook({ students, tasks, onGradeChange }: GradebookProps) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'qualificacions.csv');
+    const fileName = termToExport === 'all' ? 'qualificacions.csv' : `qualificacions_${termToExport.replace(' ', '_')}.csv`;
+    link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setIsExportOpen(false);
   };
 
   const studentAverages = students.map(student => ({
@@ -108,6 +142,13 @@ export function Gradebook({ students, tasks, onGradeChange }: GradebookProps) {
     ? (studentAverages.reduce((sum, { average }) => sum + average, 0) / studentAverages.length).toFixed(2)
     : '0.00';
 
+  const termAverages = (['1r Trimestre', '2n Trimestre', '3r Trimestre'] as Term[]).map(term => {
+    const avg = students.length > 0
+      ? (students.reduce((sum, student) => sum + parseFloat(calculateAverage(student, term)), 0) / students.length).toFixed(2)
+      : '0.00';
+    return { term, average: avg };
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center flex-wrap gap-4">
@@ -115,13 +156,13 @@ export function Gradebook({ students, tasks, onGradeChange }: GradebookProps) {
           <label className="text-sm font-medium text-slate-700">Trimestre:</label>
           <select
             value={selectedTerm}
-            onChange={(e) => setSelectedTerm(e.target.value === 'all' ? 'all' : Number(e.target.value) as Term)}
+            onChange={(e) => setSelectedTerm(e.target.value === 'all' ? 'all' : e.target.value as Term)}
             className="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white text-sm"
           >
             <option value="all">Tots els trimestres</option>
-            <option value={1}>1r Trimestre</option>
-            <option value={2}>2n Trimestre</option>
-            <option value={3}>3r Trimestre</option>
+            <option value="1r Trimestre">1r Trimestre</option>
+            <option value="2n Trimestre">2n Trimestre</option>
+            <option value="3r Trimestre">3r Trimestre</option>
           </select>
         </div>
         <div className="flex justify-end gap-3 flex-wrap">
@@ -174,28 +215,65 @@ export function Gradebook({ students, tasks, onGradeChange }: GradebookProps) {
             )}
           </div>
 
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors text-sm font-medium shadow-sm"
-          >
-            <Download className="w-4 h-4" />
-            Exportar CSV
-          </button>
+          <div className="relative" ref={exportRef}>
+            <button
+              onClick={() => setIsExportOpen(!isExportOpen)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors text-sm font-medium shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              Exportar CSV
+            </button>
+            
+            {isExportOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 z-50 overflow-hidden py-1">
+                <button
+                  onClick={() => handleExportCSV('all')}
+                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+                >
+                  Tots els trimestres
+                </button>
+                <button
+                  onClick={() => handleExportCSV('1r Trimestre')}
+                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+                >
+                  1r Trimestre
+                </button>
+                <button
+                  onClick={() => handleExportCSV('2n Trimestre')}
+                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+                >
+                  2n Trimestre
+                </button>
+                <button
+                  onClick={() => handleExportCSV('3r Trimestre')}
+                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+                >
+                  3r Trimestre
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Summary Section */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <h3 className="text-lg font-semibold text-slate-800 mb-4">Resum de Qualificacions</h3>
-        <div className="mb-6">
-          <div className="inline-block bg-indigo-50 p-4 rounded-xl border border-indigo-100 min-w-[200px]">
-            <p className="text-sm text-indigo-600 font-medium mb-1">Mitjana de la Classe</p>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 min-w-[200px] flex-1">
+            <p className="text-sm text-indigo-600 font-medium mb-1">Mitjana de la Classe (Actual)</p>
             <p className="text-3xl font-bold text-indigo-900">{classAverage}</p>
           </div>
+          {termAverages.map(({ term, average }) => (
+            <div key={term} className="bg-slate-50 p-4 rounded-xl border border-slate-200 min-w-[150px] flex-1">
+              <p className="text-sm text-slate-600 font-medium mb-1">{term}</p>
+              <p className="text-2xl font-bold text-slate-800">{average}</p>
+            </div>
+          ))}
         </div>
         
         <div>
-          <h4 className="text-sm font-medium text-slate-700 mb-3">Mitjanes per Alumne</h4>
+          <h4 className="text-sm font-medium text-slate-700 mb-3">Mitjanes per Alumne (Actual)</h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {studentAverages.map(({ student, average }) => (
               <div key={student.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100 shadow-sm">

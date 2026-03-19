@@ -1,20 +1,20 @@
 import { Task, Student, Group } from './types';
 
 export const TASKS: Task[] = [
-  { id: 't1', name: 'DISSENYA UNA PORTADA', type: 'treball', weight: 1, term: 1 },
-  { id: 't2', name: 'TEORIA DE GEOMETRIA', type: 'treball', weight: 1, term: 1 },
-  { id: 't3', name: 'VISUAL VOCABULARY BANK', type: 'treball', weight: 1, term: 1 },
-  { id: 't4', name: 'SET SQUARE', type: 'treball', weight: 1, term: 1 },
-  { id: 't5', name: 'PRÀCTICA DE PARAL.LELISME', type: 'treball', weight: 1, term: 1 },
-  { id: 't6', name: 'COMPOSICIÓ LLIURE AMB PARAL.LELES', type: 'treball', weight: 1, term: 1 },
-  { id: 't7', name: 'OPERACIONS AMB SEGMENTS', type: 'treball', weight: 1, term: 1 },
-  { id: 't8', name: 'MEDIATRIU', type: 'treball', weight: 1, term: 1 },
-  { id: 't9', name: 'TEOREMA DE TALES', type: 'treball', weight: 1, term: 1 },
-  { id: 't10', name: 'COPIA. OPERACIONS AMB ANGLES', type: 'treball', weight: 1, term: 1 },
-  { id: 't11', name: "SUMA D'ANGLES", type: 'treball', weight: 1, term: 1 },
-  { id: 't12', name: "RESTA D'ANGLES", type: 'treball', weight: 1, term: 1 },
-  { id: 't13', name: 'BISECTRIUS', type: 'treball', weight: 1, term: 1 },
-  { id: 't14', name: 'ELEMENTS DE LA CIRCUMFERÈNCIA', type: 'treball', weight: 1, term: 1 },
+  { id: 't1', name: 'DISSENYA UNA PORTADA', type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't2', name: 'TEORIA DE GEOMETRIA', type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't3', name: 'VISUAL VOCABULARY BANK', type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't4', name: 'SET SQUARE', type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't5', name: 'PRÀCTICA DE PARAL.LELISME', type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't6', name: 'COMPOSICIÓ LLIURE AMB PARAL.LELES', type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't7', name: 'OPERACIONS AMB SEGMENTS', type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't8', name: 'MEDIATRIU', type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't9', name: 'TEOREMA DE TALES', type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't10', name: 'COPIA. OPERACIONS AMB ANGLES', type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't11', name: "SUMA D'ANGLES", type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't12', name: "RESTA D'ANGLES", type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't13', name: 'BISECTRIUS', type: 'treball', weight: 1, term: '1r Trimestre' },
+  { id: 't14', name: 'ELEMENTS DE LA CIRCUMFERÈNCIA', type: 'treball', weight: 1, term: '1r Trimestre' },
 ];
 
 export const INITIAL_STUDENTS: Student[] = [

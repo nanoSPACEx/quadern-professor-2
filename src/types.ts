@@ -1,5 +1,6 @@
 export type TaskType = 'exam' | 'treball' | 'opcional';
-export type Term = 1 | 2 | 3;
+export type TermName = '1r Trimestre' | '2n Trimestre' | '3r Trimestre';
+export type Term = TermName;
 
 export interface Task {
   id: string;
