@@ -24,18 +24,25 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
   // Single edit state
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
+  // Student edit state
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [newStudentName, setNewStudentName] = useState('');
+  const [isRenameConfirmOpen, setIsRenameConfirmOpen] = useState(false);
+
+  const [error, setError] = useState<string | null>(null);
+
   const handleEditTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTask) return;
     
     if (editingTask.type === 'opcional') {
       if (editingTask.weight < 0.1 || editingTask.weight > 100) {
-        alert('El pes per a tasques opcionals ha de ser entre 0.1 i 100.');
+        setError('El pes per a tasques opcionals ha de ser entre 0.1 i 100.');
         return;
       }
     } else {
       if (editingTask.weight <= 0) {
-        alert('El pes per a treballs i exàmens ha de ser superior a 0.');
+        setError('El pes per a treballs i exàmens ha de ser superior a 0.');
         return;
       }
     }
@@ -45,6 +52,7 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
       tasks: group.tasks.map(t => t.id === editingTask.id ? editingTask : t)
     });
     setEditingTask(null);
+    setError(null);
   };
 
   const handleAddTask = (e: React.FormEvent) => {
@@ -53,12 +61,12 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
 
     if (newTaskType === 'opcional') {
       if (newTaskWeight < 0.1 || newTaskWeight > 100) {
-        alert('El pes per a tasques opcionals ha de ser entre 0.1 i 100.');
+        setError('El pes per a tasques opcionals ha de ser entre 0.1 i 100.');
         return;
       }
     } else {
       if (newTaskWeight <= 0) {
-        alert('El pes per a treballs i exàmens ha de ser superior a 0.');
+        setError('El pes per a treballs i exàmens ha de ser superior a 0.');
         return;
       }
     }
@@ -78,12 +86,10 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
     setNewTaskName('');
     setNewTaskType('treball');
     setNewTaskWeight(1);
-    // Keep the same term selected to make adding multiple tasks to the same term easier
+    setError(null);
   };
 
   const handleRemoveTask = (taskId: string) => {
-    if (!confirm("Estàs segur que vols eliminar aquesta tasca? S'esborraran també les notes associades.")) return;
-    
     // Remove task from tasks array
     const updatedTasks = group.tasks.filter(t => t.id !== taskId);
     
@@ -159,7 +165,7 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
     });
 
     if (hasValidationError) {
-      alert('Error de validació: El pes per a tasques opcionals ha de ser entre 0.1 i 100. El pes per a treballs i exàmens ha de ser superior a 0.');
+      setError('Error de validació: El pes per a tasques opcionals ha de ser entre 0.1 i 100. El pes per a treballs i exàmens ha de ser superior a 0.');
       return;
     }
 
@@ -173,28 +179,68 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
     setBulkEditType('');
     setBulkEditWeight('');
     setBulkEditTerm('');
+    setError(null);
   };
 
-  const handleBulkAddStudents = () => {
-    if (!bulkStudents.trim()) return;
+  const handleRenameStudent = () => {
+    if (!editingStudent || !newStudentName.trim()) return;
     
-    const names = bulkStudents.split('\n').map(n => n.trim()).filter(n => n);
-    const newStudents: Student[] = names.map(name => ({
-      id: `s_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      name,
-      grades: {}
-    }));
+    const updatedStudents = group.students.map(s => 
+      s.id === editingStudent.id ? { ...s, name: newStudentName.trim() } : s
+    );
 
     onUpdateGroup({
       ...group,
-      students: [...group.students, ...newStudents]
+      students: updatedStudents
     });
+    
+    setEditingStudent(null);
+    setIsRenameConfirmOpen(false);
+    setNewStudentName('');
+  };
+
+  const handleBulkAddStudents = () => {
+    const rawNames = bulkStudents.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+    if (rawNames.length === 0) {
+      setError('Si us plau, introdueix almenys un nom d\'alumne vàlid.');
+      return;
+    }
+
+    const existingNames = new Set(group.students.map(s => s.name.toLowerCase()));
+    const newStudents: Student[] = [];
+    const seenInBatch = new Set<string>();
+    const duplicates: string[] = [];
+
+    rawNames.forEach(name => {
+      const lowerName = name.toLowerCase();
+      if (existingNames.has(lowerName) || seenInBatch.has(lowerName)) {
+        duplicates.push(name);
+      } else {
+        seenInBatch.add(lowerName);
+        newStudents.push({
+          id: `s_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          name,
+          grades: {}
+        });
+      }
+    });
+
+    if (duplicates.length > 0) {
+      setError(`S'han ignorat ${duplicates.length} noms duplicats.`);
+    } else {
+      setError(null);
+    }
+
+    if (newStudents.length > 0) {
+      onUpdateGroup({
+        ...group,
+        students: [...group.students, ...newStudents]
+      });
+    }
     setBulkStudents('');
   };
 
   const handleRemoveStudent = (studentId: string) => {
-    if (!confirm('Estàs segur que vols eliminar aquest alumne i totes les seves notes?')) return;
-    
     onUpdateGroup({
       ...group,
       students: group.students.filter(s => s.id !== studentId)
@@ -283,6 +329,14 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
 
   return (
     <div className="space-y-8">
+      {error && (
+        <div className="fixed top-4 right-4 z-[100] bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="bg-rose-100 p-1.5 rounded-full">
+            <X className="w-4 h-4 cursor-pointer" onClick={() => setError(null)} />
+          </div>
+          <span className="text-sm font-medium">{error}</span>
+        </div>
+      )}
       {/* Group Info */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
@@ -416,51 +470,58 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
             )}
           </div>
 
-          <div className="max-h-96 overflow-y-auto pr-2 space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-2">
             {group.tasks.map(task => (
-              <div key={task.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-slate-50 border border-slate-100 rounded-lg group gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedTasks.has(task.id)}
-                    onChange={() => toggleTaskSelection(task.id)}
-                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 mr-2 cursor-pointer"
-                  />
-                  <span className="font-medium text-slate-700">{task.name}</span>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+              <div key={task.id} className="relative p-3 bg-slate-50 border border-slate-200 rounded-xl hover:border-indigo-300 hover:bg-white hover:shadow-sm transition-all group">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedTasks.has(task.id)}
+                      onChange={() => toggleTaskSelection(task.id)}
+                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer flex-shrink-0"
+                    />
+                    <span className="font-semibold text-slate-700 truncate" title={task.name}>{task.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <button
+                      onClick={() => setEditingTask(task)}
+                      className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                      title="Editar tasca"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleRemoveTask(task.id)}
+                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                      title="Eliminar tasca"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap gap-1.5">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider ${
                     task.type === 'exam' ? 'bg-rose-100 text-rose-700' : 
                     task.type === 'opcional' ? 'bg-purple-100 text-purple-700' : 
                     'bg-emerald-100 text-emerald-700'
                   }`}>
                     {task.type === 'exam' ? 'Examen' : task.type === 'opcional' ? 'Opcional' : 'Treball'}
                   </span>
-                  <span className="text-xs px-2 py-1 rounded-full font-medium bg-blue-100 text-blue-700">
-                    {task.term}
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider bg-blue-100 text-blue-700">
+                    {task.term ? task.term.split(' ')[0] : '-'}
                   </span>
-                  <span className="text-xs px-2 py-1 rounded-full font-medium bg-amber-100 text-amber-700">
-                    {task.type === 'opcional' ? `Bonus: +${task.weight}%` : `Pes: ${task.weight}`}
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider bg-amber-100 text-amber-700">
+                    {task.type === 'opcional' ? `+${task.weight}%` : `x${task.weight}`}
                   </span>
-                </div>
-                <div className="flex items-center gap-2 self-end sm:self-auto">
-                  <button
-                    onClick={() => setEditingTask(task)}
-                    className="text-slate-400 hover:text-indigo-600 sm:opacity-0 group-hover:opacity-100 transition-all"
-                    title="Editar tasca"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleRemoveTask(task.id)}
-                    className="text-slate-400 hover:text-rose-600 sm:opacity-0 group-hover:opacity-100 transition-all"
-                    title="Eliminar tasca"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
             ))}
             {group.tasks.length === 0 && (
-              <p className="text-slate-500 text-sm italic text-center py-4">No hi ha tasques en aquest grup.</p>
+              <div className="col-span-full py-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                <p className="text-slate-500 text-sm italic">No hi ha tasques en aquest grup.</p>
+              </div>
             )}
           </div>
         </div>
@@ -495,13 +556,25 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
             {group.students.map(student => (
               <div key={student.id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-100 rounded-lg group">
                 <span className="font-medium text-slate-700 truncate mr-2" title={student.name}>{student.name}</span>
-                <button
-                  onClick={() => handleRemoveStudent(student.id)}
-                  className="text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
-                  title="Eliminar alumne"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingStudent(student);
+                      setNewStudentName(student.name);
+                    }}
+                    className="text-slate-400 hover:text-indigo-600 transition-all opacity-0 group-hover:opacity-100"
+                    title="Editar alumne"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleRemoveStudent(student.id)}
+                    className="text-slate-400 hover:text-rose-600 transition-all flex-shrink-0"
+                    title="Eliminar alumne"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
             {group.students.length === 0 && (
@@ -682,6 +755,84 @@ export function Settings({ group, onUpdateGroup }: SettingsProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Edit Student Modal */}
+      {editingStudent && !isRenameConfirmOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                <Edit className="w-5 h-5 text-indigo-600" />
+                Editar Alumne
+              </h3>
+              <button 
+                onClick={() => setEditingStudent(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nom de l'alumne</label>
+                <input
+                  type="text"
+                  value={newStudentName}
+                  onChange={(e) => setNewStudentName(e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  required
+                />
+              </div>
+              <div className="pt-4 flex gap-3 justify-end">
+                <button
+                  onClick={() => setEditingStudent(null)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                >
+                  Cancel·lar
+                </button>
+                <button
+                  onClick={() => {
+                    if (newStudentName.trim() !== editingStudent.name) {
+                      setIsRenameConfirmOpen(true);
+                    } else {
+                      setEditingStudent(null);
+                    }
+                  }}
+                  disabled={!newStudentName.trim()}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50"
+                >
+                  Desar Canvis
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Confirmation Modal */}
+      {isRenameConfirmOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Confirmar canvi de nom</h3>
+            <p className="text-slate-600 mb-6">
+              Estàs segur que vols canviar el nom de <span className="font-semibold text-slate-800">"{editingStudent?.name}"</span> a <span className="font-semibold text-slate-800">"{newStudentName}"</span>?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setIsRenameConfirmOpen(false)}
+                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+              >
+                Enrere
+              </button>
+              <button
+                onClick={handleRenameStudent}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+              >
+                Confirmar
+              </button>
+            </div>
           </div>
         </div>
       )}

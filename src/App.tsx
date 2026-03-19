@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, BarChart3, GraduationCap, Settings as SettingsIcon, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, BarChart3, GraduationCap, Settings as SettingsIcon, Plus, Trash2, X } from 'lucide-react';
 import { DEFAULT_GROUP } from './data';
 import { Group } from './types';
 import { Gradebook } from './components/Gradebook';
@@ -23,6 +23,8 @@ export default function App() {
   });
 
   const [activeGroupId, setActiveGroupId] = useState<string>(groups[0]?.id || '');
+  const [error, setError] = useState<string | null>(null);
+  const [isDeletingGroup, setIsDeletingGroup] = useState(false);
 
   // Save to localStorage whenever groups change
   useEffect(() => {
@@ -46,14 +48,17 @@ export default function App() {
 
   const handleDeleteGroup = () => {
     if (groups.length <= 1) {
-      alert("No pots eliminar l'últim grup. Crea'n un de nou primer.");
+      setError("No pots eliminar l'últim grup. Crea'n un de nou primer.");
       return;
     }
-    if (!confirm(`Estàs segur que vols eliminar el grup "${activeGroup.name}" i totes les seves dades?`)) return;
-    
+    setIsDeletingGroup(true);
+  };
+
+  const confirmDeleteGroup = () => {
     const newGroups = groups.filter(g => g.id !== activeGroupId);
     setGroups(newGroups);
     setActiveGroupId(newGroups[0].id);
+    setIsDeletingGroup(false);
   };
 
   const handleUpdateGroup = (updatedGroup: Group) => {
@@ -83,6 +88,40 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+      {error && (
+        <div className="fixed top-4 right-4 z-[100] bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="bg-rose-100 p-1.5 rounded-full">
+            <X className="w-4 h-4 cursor-pointer" onClick={() => setError(null)} />
+          </div>
+          <span className="text-sm font-medium">{error}</span>
+        </div>
+      )}
+
+      {isDeletingGroup && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-in zoom-in duration-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Eliminar Grup</h3>
+            <p className="text-slate-600 mb-6">
+              Estàs segur que vols eliminar el grup <span className="font-bold">"{activeGroup.name}"</span>? Aquesta acció no es pot desfer i s'esborraran totes les dades del grup.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setIsDeletingGroup(false)}
+                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+              >
+                Cancel·lar
+              </button>
+              <button
+                onClick={confirmDeleteGroup}
+                className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors font-medium"
+              >
+                Eliminar definitivament
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
